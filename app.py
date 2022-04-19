@@ -41,8 +41,16 @@ def servicio_default():
 
     # puedes checar alternativas para mapeo de datos
     # por hoy vamos a armar un objeto jsoneable para regresar 
+    resultado = []
+    for current in data:
+        actual = {
+            "id" : current[0],
+            "nombre" : current[1],
+            "peso" : current[2]
+        }
+        resultado.append(actual)
 
-    return "HOLA A TODOS <a href='/segunda'>segunda</a>"
+    return jsonify(resultado)
 
 # podemos tener todas las rutas
 @app.route("/segunda")
