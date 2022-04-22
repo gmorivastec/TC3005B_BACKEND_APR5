@@ -4,6 +4,10 @@ from flask import Flask, jsonify
 from markupsafe import escape
 from flask_db2 import DB2
 import sys 
+from flask_cors import CORS
+import sqlalchemy
+from sqlalchemy import *
+import ibm_db_sa
 
 # 2do - creamos un objeto de tipo flask
 app = Flask(__name__)
@@ -17,6 +21,8 @@ app.config['DB2_USER'] = 'db2inst1'
 app.config['DB2_PASSWORD'] = 'hola'
 
 db = DB2(app)
+
+CORS(app)
 
 # 3ero - al objeto de tipo flask le agregamos rutas
 # @ en python significa que vamos a usar un decorator
@@ -55,6 +61,21 @@ def servicio_default():
 # podemos tener todas las rutas
 @app.route("/segunda")
 def segunda_ruta():
+    engine = sqlalchemy.create_engine("ibm_db_sa://db2inst1:hola@localhost:50000/testdb")
+    connection = engine.connect()
+    metadata = sqlalchemy.MetaData()
+    gatitos = Table('gatitos', metadata,
+        Column('id', Integer, primary_key=True),
+        Column('nombre', String(150), nullable=False),
+        Column('peso', Integer, nullable=False)
+    )
+
+    query = sqlalchemy.select([gatitos])
+    cursor = connection.execute(query)
+    resultados = cursor.fetchall()
+
+    print(resultados, file=sys.stdout)
+
     return "<h1>UNA SEGUNDA RUTA</h1>"
 
 # podemos recibir variables a través de URL
