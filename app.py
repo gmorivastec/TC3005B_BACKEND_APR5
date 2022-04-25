@@ -8,6 +8,9 @@ from flask_cors import CORS
 import sqlalchemy
 from sqlalchemy import *
 import ibm_db_sa
+import flask_login
+import secrets 
+import flask
 
 # 2do - creamos un objeto de tipo flask
 app = Flask(__name__)
@@ -23,6 +26,74 @@ app.config['DB2_PASSWORD'] = 'hola'
 db = DB2(app)
 
 CORS(app)
+
+# CÓDIGO PARA LOGIN 
+# necesitamos una llave secreta 
+app.secret_key = secrets.token_urlsafe(16)
+login_manager = flask_login.LoginManager()
+login_manager.init_app(app)
+
+# PSEUDO BASE DE DATOS DE USUARIOS
+usuarios = {"a@a.com" : {"pass" : "hola"}}
+
+# definir una clase para contener la descripción de nuestros usuarios
+class Usuario(flask_login.UserMixin):
+    pass
+
+# pass - keyword en python que significa que no haga nada.
+
+# 2 callbacks necesarios para la lógica de control de usuarios
+# user_loader
+# request_loader
+# los 2 usan el patron decorator 
+
+@login_manager.user_loader
+def user_loader(email):
+    # verificar vs fuente de datos 
+    if email not in usuarios:
+        return
+    
+    usuario = Usuario()
+    usuario.id = email
+    return usuario
+
+@login_manager.request_loader
+def request_loader(request):
+    email = request.form.get('email')
+    if email not in usuarios:
+        return
+
+    usuario = Usuario()
+    usuario.id = email
+    return usuario
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # podemos verificar con qué método se accedió 
+    if flask.request.method == 'GET':
+        return '''
+                <form action='login' method='POST'>
+                    <input type='text' name='email' /><br />
+                    <input type='password' name='password' /><br />
+                    <input type='submit' name='HACER LOGIN' />
+                </form>
+        
+        '''
+    
+    # de otra manera tuvo que ser POST
+    # obtener datos 
+    email = flask.request.form['email']
+    
+    # verificar validez de usuario vs fuente de datos
+    if email in usuarios and flask.request.form['password'] == usuarios[email]['pass']:
+        user = Usuario()
+        user.id = email
+        flask_login.login_user(user)
+        return "ENTRASTE CORRECTAMENTE"
+
+    # si no jaló mostrar error
+    return "CREDENCIALES INVÁLIDAS"
+
 
 # 3ero - al objeto de tipo flask le agregamos rutas
 # @ en python significa que vamos a usar un decorator
