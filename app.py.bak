@@ -11,8 +11,6 @@ import ibm_db_sa
 import flask_login
 import secrets 
 import flask
-from argon2 import PasswordHasher
-import time
 
 # 2do - creamos un objeto de tipo flask
 app = Flask(__name__)
@@ -63,18 +61,9 @@ def user_loader(email):
 @login_manager.request_loader
 def request_loader(request):
 
-    # recibimos token de encabezado
-
-    # verificamos vs base de datos validez de token
-
-    # regresamos objeto si hubo Y token valido 
-
-    # None si no 
-    
     # obtener información que nos mandan en encabezado
     key = request.headers.get('Authorization')
     print(key, file=sys.stdout)
-
 
     if key == ":":
         return None
@@ -88,74 +77,35 @@ def request_loader(request):
 
     return None
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    # podemos verificar con qué método se accedió 
+    if flask.request.method == 'GET':
+        return '''
+                <form action='login' method='POST'>
+                    <input type='text' name='email' /><br />
+                    <input type='password' name='password' /><br />
+                    <input type='submit' name='HACER LOGIN' />
+                </form>
+        
+        '''
     
-    # intro al password hasher
-    ph = PasswordHasher()
-
-    # como hashear
-    hash = ph.hash("HOLA")
-    print(hash, file=sys.stdout)
-
-    hash = ph.hash("HOLA")
-    print(hash, file=sys.stdout)
-
-    hash = ph.hash("HOLA")
-    print(hash, file=sys.stdout)
-
-    # como comprobar que un valor es el mismo que uno ya hasheado
-    try:
-        print(ph.verify(hash, "ADIOS"), file=sys.stdout)
-    except:
-        print("NO ES IGUAL", file=sys.stdout)
-
+    # de otra manera tuvo que ser POST
+    # obtener datos 
     email = flask.request.form['email']
-
-    # 1. verificar existencia de usuario
-    cur = db.connection.cursor()
-
-    query = "SELECT * FROM users WHERE email=?"
     
-    # vamos a usar prepared statements
-    # nos permite parametrizar un query
-    # evita inyecciones de SQL
+    # verificar validez de usuario vs fuente de datos
+    if email in usuarios and flask.request.form['pass'] == usuarios[email]['pass']:
+        user = Usuario()
+        user.id = email
+        flask_login.login_user(user)
+        # OJO AQUI
+        # esta es la parte en donde pueden generar un token
+        # return flask.redirect(flask.url_for('protegido'))
+        return "USUARIO VALIDO", 200
 
-    # tupla de python - estructura de datos lineal que contiene 
-    # datos heterogéneos
-    params = (email, )
-
-    cur.execute(query, params)
-    data = cur.fetchone()
-    cur.close()
-
-    if(data == None):
-        return "USUARIO NO VALIDO", 401
-
-    print(data, file=sys.stdout)
-    print(len(data), file=sys.stdout)
-
-    # 2. verificar validez de password
-    try:
-        ph.verify(data[2], flask.request.form['pass'])
-    except:
-        # 3. password invalido - no login
-        return "PASSWORD NO VALIDO", 401
-
-    # 4. password valido - actualizar token y regresarlo
-    token = secrets.token_urlsafe(32)
-    # así se obtiene el timestamp del momento actual
-    last_date = time.time()
-    
-    # 5. actualizar BD con entrada de usuario
-    cur = db.connection.cursor()
-    query = "UPDATE users SET token=?, last_date=? WHERE email=?"
-    params = (ph.hash(token), last_date, email)
-    cur.execute(query, params)
-    cur.close()
-    
     # si no jaló mostrar error
-    return token, 200
+    return "CREDENCIALES INVÁLIDAS", 401
 
 @app.route('/protegido')
 @cross_origin()
