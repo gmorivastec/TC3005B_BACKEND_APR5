@@ -14,6 +14,9 @@ import flask
 from argon2 import PasswordHasher
 import time
 
+# timestamp - milesimas de segundo desde 1 de enero de 1970 
+VIDA_TOKEN = 1000 * 60 * 3
+
 # 2do - creamos un objeto de tipo flask
 app = Flask(__name__)
 
@@ -63,30 +66,60 @@ def user_loader(email):
 @login_manager.request_loader
 def request_loader(request):
 
-    # recibimos token de encabezado
-
-    # verificamos vs base de datos validez de token
-
-    # regresamos objeto si hubo Y token valido 
-
-    # None si no 
-    
     # obtener información que nos mandan en encabezado
     key = request.headers.get('Authorization')
     print(key, file=sys.stdout)
-
 
     if key == ":":
         return None
 
     processed = key.split(":")
 
-    if processed[0] in usuarios and processed[1] == usuarios[processed[0]]['pass']:
-        user = Usuario()
-        user.id = processed[0]
-        return user
+    # recibimos token de encabezado
+    usuario = processed[0]
+    token = processed[1]
 
-    return None
+    # verificamos que usuario exista
+    cur = db.connection.cursor()
+
+    query = "SELECT * FROM users WHERE email=?"
+    params = (usuario, )
+
+    cur.execute(query, params)
+    data = cur.fetchone()
+    cur.close()
+
+    if(not data):
+        return None
+
+    # verificamos que tenga token válido
+    ph = PasswordHasher()
+
+    try:
+        ph.verify(data[3], token)
+    except:
+        return None    
+
+    # verificamos que el token siga vigente
+    timestamp_actual = time.time()
+
+    if(data[4] + VIDA_TOKEN < timestamp_actual):
+        return None
+
+    # actualizar vigencia del token 
+    cur = db.connection.cursor()
+    query = "UPDATE users SET last_date=? WHERE email=?"
+    params = (timestamp_actual, usuario)
+    cur.execute(query, params)
+    cur.close()
+
+    # regresamos objeto si hubo Y token valido 
+    result = Usuario()
+    result.id = usuario
+    result.nombre = "Pruebita"
+    result.apellido = "Rodriguez"
+    result.rol = "ADMIN"
+    return result
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -155,11 +188,15 @@ def login():
     cur.close()
     
     # si no jaló mostrar error
-    return token, 200
+    return jsonify(token=token, caducidad=VIDA_TOKEN), 200
 
 @app.route('/protegido')
 @cross_origin()
+@flask_login.login_required
 def protegido():
+    print(flask_login.current_user.nombre, file=sys.stdout)
+    print(flask_login.current_user.apellido, file=sys.stdout)
+    print(flask_login.current_user.rol, file=sys.stdout)
     return jsonify(protegido=flask_login.current_user.is_authenticated)
 
 @login_manager.unauthorized_handler
@@ -167,8 +204,17 @@ def handler():
     return 'No autorizado', 401
 
 @app.route('/logout')
+@cross_origin()
+@flask_login.login_required
 def logout():
-    flask_login.logout_user()
+    
+    print(flask_login.current_user.id, file=sys.stdout)
+
+    cur = db.connection.cursor()
+    query = "UPDATE users SET last_date=? WHERE email=?"
+    params = (0, flask_login.current_user.id)
+    cur.execute(query, params)
+    cur.close()
     return 'saliste'
 
 # 3ero - al objeto de tipo flask le agregamos rutas
