@@ -22,11 +22,28 @@ class Usuario(Base):
     last_date = Column(Integer)
 
 # objeto engine para la conexión
+#  PARA POSTGRE: 'postgresql://scott:tiger@localhost:5432/mydatabase'
 engine = create_engine('ibm_db_sa://db2inst1:hola@localhost:50000/testdb')
 session = Session(engine)
 
+# creación de nuevo registro 
+nuevoUsuario = Usuario(
+    email="ejemplo@ejemplo.com",
+    PASSWORD="UN PASSWORDCITO",
+    token="SOY UN TOKEN MUY SEGURO",
+    last_date=10
+)
+
+session.add_all([nuevoUsuario])
+session.commit()
+
 #hacer query
-stmt = select(Usuario).where(Usuario.email.in_(["a@a.com"]))
+#stmt = select(Usuario).where(Usuario.email.in_(["a@a.com"]))
+stmt = select(Usuario)
 for user in session.scalars(stmt):
     print(user.email)
+    print(user.PASSWORD)
     print(user.token)
+
+
+
