@@ -191,7 +191,6 @@ def login():
     return jsonify(token=token, caducidad=VIDA_TOKEN), 200
 
 @app.route('/protegido')
-@cross_origin()
 @flask_login.login_required
 def protegido():
     print(flask_login.current_user.nombre, file=sys.stdout)
